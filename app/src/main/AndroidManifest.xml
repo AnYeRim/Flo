@@ -10,6 +10,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Flo.NoActionBar">
         <activity
+            android:name=".LyricsActivity"
+            android:exported="false" />
+        <activity
             android:name=".SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.Flo.NoActionBar">
@@ -22,9 +25,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="false"
-            android:theme="@style/Theme.Flo.NoActionBar">
-
-        </activity>
+            android:theme="@style/Theme.Flo.NoActionBar"></activity>
     </application>
 
 </manifest>
