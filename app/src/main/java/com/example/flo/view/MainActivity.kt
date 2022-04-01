@@ -1,12 +1,13 @@
 package com.example.flo.view
 
-import android.content.Intent
 import android.media.AudioManager
 import android.media.MediaPlayer
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.SeekBar
+import android.widget.SeekBar.OnSeekBarChangeListener
 import com.bumptech.glide.Glide
 import com.example.flo.R
 import com.example.flo.model.APIClient
@@ -20,11 +21,11 @@ import retrofit2.Response
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.flo.model.Lyrics
 import com.example.flo.view.adapter.AdapterLyrics
-
+import java.lang.Exception
 
 class MainActivity : AppCompatActivity() {
     val tag = "MainActivity"
-    private var mediaPlayer: MediaPlayer? = null
+    private var mediaPlayer: MediaPlayer? = MediaPlayer()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,19 +33,51 @@ class MainActivity : AppCompatActivity() {
 
         doGetSong()
 
+        class RealTimeSeekBar: Thread() {
+            override fun run() {
+                super.run()
+                while (mediaPlayer!!.isPlaying) {
+                    try {
+                        sleep(1000)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    seekBar.progress = mediaPlayer!!.currentPosition
+                }
+            }
+        }
+
         btnPlay.setOnClickListener {
             btnPlay.visibility = View.GONE
             btnPause.visibility = View.VISIBLE
 
-            mediaPlayer?.start()
+            mediaPlayer!!.start()
+            RealTimeSeekBar().start()
         }
 
         btnPause.setOnClickListener {
             btnPlay.visibility = View.VISIBLE
             btnPause.visibility = View.GONE
 
-            mediaPlayer?.pause()
+            mediaPlayer!!.pause()
+            RealTimeSeekBar().interrupt()
         }
+
+        seekBar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    mediaPlayer!!.seekTo(progress)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+            }
+
+        })
+
     }
 
     private fun doGetSong() {
@@ -63,12 +96,13 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun setSongData(song : Song){
+    private fun setSongData(song: Song) {
         txtAlbum.text = song.album
         txtTitle.text = song.title
         txtSinger.text = song.singer
         Glide.with(applicationContext).load(song.image).into(imgAlbumCover)
         setRecyclerMessage(toLyrics(song.lyrics))
+        seekBar.max = song.duration * 1000
         mediaPlayer = MediaPlayer().apply {
             setAudioStreamType(AudioManager.STREAM_MUSIC)
             setDataSource(song.file)
