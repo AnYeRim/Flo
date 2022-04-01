@@ -4,6 +4,8 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Message
 import android.util.Log
 import android.view.View
 import android.widget.SeekBar
@@ -24,8 +26,15 @@ import com.example.flo.view.adapter.AdapterLyrics
 import java.lang.Exception
 
 class MainActivity : AppCompatActivity() {
+
     val tag = "MainActivity"
+
     private var mediaPlayer: MediaPlayer? = MediaPlayer()
+
+    private var song: Song? = null
+    private var lyricsList: ArrayList<Lyrics>? = null
+
+    private var adapterLyrics : AdapterLyrics? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +42,7 @@ class MainActivity : AppCompatActivity() {
 
         doGetSong()
 
-        class RealTimeSeekBar: Thread() {
+        class RealTimeSeekBar : Thread() {
             override fun run() {
                 super.run()
                 while (mediaPlayer!!.isPlaying) {
@@ -43,6 +52,16 @@ class MainActivity : AppCompatActivity() {
                         e.printStackTrace()
                     }
                     seekBar.progress = mediaPlayer!!.currentPosition
+                    // TODO 현재 재생되는 부분의 가사로 recyclerView의 포지션 맞추기
+                    for (i in 0 until lyricsList!!.size) {
+                        if (lyricsList!![i].milliseconds > seekBar.progress) {
+                            handler.post {
+                                recyclerLyrics.smoothScrollToPosition(i)
+                                adapterLyrics!!.boldText(i)
+                            }
+                            break
+                        }
+                    }
                 }
             }
         }
@@ -66,7 +85,7 @@ class MainActivity : AppCompatActivity() {
         seekBar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    mediaPlayer!!.seekTo(progress)
+                    movePlayPosition(progress)
                 }
             }
 
@@ -75,9 +94,15 @@ class MainActivity : AppCompatActivity() {
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
             }
-
         })
 
+    }
+
+    val handler: Handler = object : Handler() {
+    }
+
+    fun movePlayPosition(position: Int) {
+        mediaPlayer!!.seekTo(position)
     }
 
     private fun doGetSong() {
@@ -85,7 +110,9 @@ class MainActivity : AppCompatActivity() {
         call.enqueue(object : Callback<Song> {
             override fun onResponse(call: Call<Song>, response: Response<Song>) {
                 if (response.isSuccessful && response != null) {
-                    setSongData(response.body()!!)
+                    song = response.body()!!
+                    lyricsList = toLyrics(song!!.lyrics)
+                    setSongData()
                 }
             }
 
@@ -96,30 +123,33 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun setSongData(song: Song) {
-        txtAlbum.text = song.album
-        txtTitle.text = song.title
-        txtSinger.text = song.singer
-        Glide.with(applicationContext).load(song.image).into(imgAlbumCover)
-        setRecyclerMessage(toLyrics(song.lyrics))
-        seekBar.max = song.duration * 1000
+    private fun setSongData() {
+        txtAlbum.text = song!!.album
+        txtTitle.text = song!!.title
+        txtSinger.text = song!!.singer
+        Glide.with(applicationContext).load(song!!.image).into(imgAlbumCover)
+        setRecyclerMessage(lyricsList!!)
+        seekBar.max = song!!.duration * 1000
         mediaPlayer = MediaPlayer().apply {
             setAudioStreamType(AudioManager.STREAM_MUSIC)
-            setDataSource(song.file)
+            setDataSource(song!!.file)
             prepare()
         }
     }
 
     private fun setRecyclerMessage(arrayLyrics: ArrayList<Lyrics>) {
         recyclerLyrics.layoutManager = LinearLayoutManager(this)
-        recyclerLyrics.adapter = AdapterLyrics(this, arrayLyrics)
+        adapterLyrics = AdapterLyrics(this, arrayLyrics)
+        recyclerLyrics.adapter = adapterLyrics
     }
 
     private fun toLyrics(data: String): ArrayList<Lyrics> {
         var arrayLyrics: ArrayList<Lyrics> = ArrayList()
         for (i in data.split("\n")) {
             var lyrics = Lyrics()
-            lyrics.time = i.split("]")[0].substring(1)
+            var time = i.split("[")[1].split("]")[0].split(":")
+            lyrics.milliseconds =
+                time[0].toInt() * 60 * 1000 + time[1].toInt() * 1000 + time[2].toInt()
             lyrics.context = i.split("]")[1]
             arrayLyrics.add(lyrics)
         }

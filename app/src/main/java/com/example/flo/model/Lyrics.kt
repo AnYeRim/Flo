@@ -1,6 +1,7 @@
 package com.example.flo.model
 
 class Lyrics {
-    var time: String = ""
+    var milliseconds : Int = 0
     var context: String = ""
+    var running : Boolean = false
 }
